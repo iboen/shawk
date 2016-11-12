@@ -5,11 +5,18 @@ import android.content.Context;
 import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.RemoteException;
 import android.util.Log;
+import android.widget.Toast;
+
 import com.google.android.gms.gcm.GcmNetworkManager;
 import com.google.android.gms.gcm.GcmTaskService;
 import com.google.android.gms.gcm.TaskParams;
+import com.sam_chordas.android.stockhawk.R;
 import com.sam_chordas.android.stockhawk.data.QuoteColumns;
 import com.sam_chordas.android.stockhawk.data.QuoteProvider;
 import com.sam_chordas.android.stockhawk.rest.Utils;
@@ -18,7 +25,9 @@ import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 
 /**
  * Created by sam_chordas on 9/30/15.
@@ -38,13 +47,27 @@ public class StockTaskService extends GcmTaskService{
   public StockTaskService(Context context){
     mContext = context;
   }
+
   String fetchData(String url) throws IOException{
     Request request = new Request.Builder()
         .url(url)
         .build();
 
-    Response response = client.newCall(request).execute();
-    return response.body().string();
+    try {
+      Response response = client.newCall(request).execute();
+      return response.body().string();
+    } catch (UnknownHostException | SocketTimeoutException e) {
+      // Connection was exist, but can't get data from server (server may down or inaccessible)
+      Handler h = new Handler(Looper.getMainLooper());
+      h.post(new Runnable() {
+        @Override
+        public void run() {
+          Toast.makeText(mContext, "Can not update from server. Check your connection.", Toast.LENGTH_SHORT).show();
+        }
+      });
+    }
+
+    return "";
   }
 
   @Override
@@ -53,6 +76,27 @@ public class StockTaskService extends GcmTaskService{
     if (mContext == null){
       mContext = this;
     }
+
+    ConnectivityManager cm =
+            (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+
+    NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+    boolean isConnected = activeNetwork != null &&
+            activeNetwork.isConnectedOrConnecting();
+
+    if (!isConnected) {
+      Handler h = new Handler(Looper.getMainLooper());
+      h.post(new Runnable() {
+        @Override
+        public void run() {
+          Toast.makeText(mContext, getString(R.string.stocks_out_of_date), Toast.LENGTH_SHORT).show();
+        }
+      });
+
+      return GcmNetworkManager.RESULT_FAILURE;
+    }
+
+
     StringBuilder urlStringBuilder = new StringBuilder();
     try{
       // Base URL for the Yahoo query
@@ -112,19 +156,23 @@ public class StockTaskService extends GcmTaskService{
       urlString = urlStringBuilder.toString();
       try{
         getResponse = fetchData(urlString);
-        result = GcmNetworkManager.RESULT_SUCCESS;
-        try {
-          ContentValues contentValues = new ContentValues();
-          // update ISCURRENT to 0 (false) so new data is current
-          if (isUpdate){
-            contentValues.put(QuoteColumns.ISCURRENT, 0);
-            mContext.getContentResolver().update(QuoteProvider.Quotes.CONTENT_URI, contentValues,
-                null, null);
+        if (!getResponse.isEmpty()) {
+          result = GcmNetworkManager.RESULT_SUCCESS;
+          try {
+            ContentValues contentValues = new ContentValues();
+            // update ISCURRENT to 0 (false) so new data is current
+            if (isUpdate){
+              contentValues.put(QuoteColumns.ISCURRENT, 0);
+              mContext.getContentResolver().update(QuoteProvider.Quotes.CONTENT_URI, contentValues,
+                      null, null);
+            }
+            mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
+                    Utils.quoteJsonToContentVals(getResponse));
+          }catch (RemoteException | OperationApplicationException e){
+            Log.e(LOG_TAG, "Error applying batch insert", e);
           }
-          mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
-              Utils.quoteJsonToContentVals(getResponse));
-        }catch (RemoteException | OperationApplicationException e){
-          Log.e(LOG_TAG, "Error applying batch insert", e);
+        } else {
+          result = GcmNetworkManager.RESULT_FAILURE;
         }
       } catch (IOException e){
         e.printStackTrace();

@@ -90,7 +90,6 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
             }));
     recyclerView.setAdapter(mCursorAdapter);
 
-
     FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
     fab.attachToRecyclerView(recyclerView);
     fab.setOnClickListener(new View.OnClickListener() {
@@ -134,25 +133,24 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
     mItemTouchHelper.attachToRecyclerView(recyclerView);
 
     mTitle = getTitle();
-    if (isConnected){
-      long period = 3600L;
-      long flex = 10L;
-      String periodicTag = "periodic";
+    long period = 3600L;
+    long flex = 10L;
+    String periodicTag = "periodic";
 
-      // create a periodic task to pull stocks once every hour after the app has been opened. This
-      // is so Widget data stays up to date.
-      PeriodicTask periodicTask = new PeriodicTask.Builder()
-          .setService(StockTaskService.class)
-          .setPeriod(period)
-          .setFlex(flex)
-          .setTag(periodicTag)
-          .setRequiredNetwork(Task.NETWORK_STATE_CONNECTED)
-          .setRequiresCharging(false)
-          .build();
-      // Schedule task with tag "periodic." This ensure that only the stocks present in the DB
-      // are updated.
-      GcmNetworkManager.getInstance(this).schedule(periodicTask);
-    }
+    // create a periodic task to pull stocks once every hour after the app has been opened. This
+    // is so Widget data stays up to date.
+
+    PeriodicTask periodicTask = new PeriodicTask.Builder()
+        .setService(StockTaskService.class)
+        .setPeriod(period)
+        .setFlex(flex)
+        .setTag(periodicTag)
+        .setRequiredNetwork(Task.NETWORK_STATE_ANY)
+        .setRequiresCharging(false)
+        .build();
+    // Schedule task with tag "periodic." This ensure that only the stocks present in the DB
+    // are updated.
+    GcmNetworkManager.getInstance(this).schedule(periodicTask);
   }
 
 
