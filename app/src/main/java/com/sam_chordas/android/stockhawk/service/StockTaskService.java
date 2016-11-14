@@ -1,5 +1,6 @@
 package com.sam_chordas.android.stockhawk.service;
 
+import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.OperationApplicationException;
@@ -11,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.util.Log;
+import android.view.Gravity;
 import android.widget.Toast;
 
 import com.google.android.gms.gcm.GcmNetworkManager;
@@ -28,6 +30,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 
 /**
  * Created by sam_chordas on 9/30/15.
@@ -154,6 +157,7 @@ public class StockTaskService extends GcmTaskService{
 
     if (urlStringBuilder != null){
       urlString = urlStringBuilder.toString();
+//      Log.d(LOG_TAG, "API:" + urlString);
       try{
         getResponse = fetchData(urlString);
         if (!getResponse.isEmpty()) {
@@ -166,8 +170,25 @@ public class StockTaskService extends GcmTaskService{
               mContext.getContentResolver().update(QuoteProvider.Quotes.CONTENT_URI, contentValues,
                       null, null);
             }
-            mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY,
-                    Utils.quoteJsonToContentVals(getResponse));
+
+            ArrayList contents = Utils.quoteJsonToContentVals(getResponse);
+            if (!contents.isEmpty()) {
+              mContext.getContentResolver().applyBatch(QuoteProvider.AUTHORITY, contents);
+            } else {
+              Handler h = new Handler(Looper.getMainLooper());
+              h.post(new Runnable() {
+                @Override
+                public void run() {
+                  Toast toast =
+                            Toast.makeText(mContext, "This stock is not found!",
+                                    Toast.LENGTH_LONG);
+                  toast.setGravity(Gravity.CENTER, Gravity.CENTER, 0);
+                  toast.show();
+                }
+              });
+              return  GcmNetworkManager.RESULT_FAILURE;
+            }
+
           }catch (RemoteException | OperationApplicationException e){
             Log.e(LOG_TAG, "Error applying batch insert", e);
           }
