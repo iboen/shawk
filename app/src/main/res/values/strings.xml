@@ -10,4 +10,6 @@
   <string name="input_hint">FB</string>
   <string name="input_prefill"></string>
   <string name="network_toast">Uh-oh! This app requires an internet connection</string>
+
+  <string name="banner_ad_unit_id">ca-app-pub-5497107252496672/6331626144</string>
 </resources>

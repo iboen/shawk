@@ -21,6 +21,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 import com.afollestad.materialdialogs.MaterialDialog;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.MobileAds;
 import com.sam_chordas.android.stockhawk.R;
 import com.sam_chordas.android.stockhawk.data.QuoteColumns;
 import com.sam_chordas.android.stockhawk.data.QuoteProvider;
@@ -56,14 +59,16 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_my_stocks);
+
     mContext = this;
+
     ConnectivityManager cm =
-        (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+            (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
 
     NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
     isConnected = activeNetwork != null &&
-        activeNetwork.isConnectedOrConnecting();
-    setContentView(R.layout.activity_my_stocks);
+            activeNetwork.isConnectedOrConnecting();
     // The intent service is for executing immediate pulls from the Yahoo API
     // GCMTaskService can only schedule tasks, they cannot execute immediately
     mServiceIntent = new Intent(this, StockIntentService.class);
@@ -90,6 +95,11 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
             }));
     recyclerView.setAdapter(mCursorAdapter);
 
+    MobileAds.initialize(getApplicationContext(), getResources().getString(R.string.banner_ad_unit_id));
+
+    AdView mAdView = (AdView) findViewById(R.id.adView);
+    AdRequest adRequest = new AdRequest.Builder().build();
+    mAdView.loadAd(adRequest);
 
     FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
     fab.attachToRecyclerView(recyclerView);
@@ -97,31 +107,31 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
       @Override public void onClick(View v) {
         if (isConnected){
           new MaterialDialog.Builder(mContext).title(R.string.symbol_search)
-              .content(R.string.content_test)
-              .inputType(InputType.TYPE_CLASS_TEXT)
-              .input(R.string.input_hint, R.string.input_prefill, new MaterialDialog.InputCallback() {
-                @Override public void onInput(MaterialDialog dialog, CharSequence input) {
-                  // On FAB click, receive user input. Make sure the stock doesn't already exist
-                  // in the DB and proceed accordingly
-                  Cursor c = getContentResolver().query(QuoteProvider.Quotes.CONTENT_URI,
-                      new String[] { QuoteColumns.SYMBOL }, QuoteColumns.SYMBOL + "= ?",
-                      new String[] { input.toString() }, null);
-                  if (c.getCount() != 0) {
-                    Toast toast =
-                        Toast.makeText(MyStocksActivity.this, "This stock is already saved!",
-                            Toast.LENGTH_LONG);
-                    toast.setGravity(Gravity.CENTER, Gravity.CENTER, 0);
-                    toast.show();
-                    return;
-                  } else {
-                    // Add the stock to DB
-                    mServiceIntent.putExtra("tag", "add");
-                    mServiceIntent.putExtra("symbol", input.toString());
-                    startService(mServiceIntent);
-                  }
-                }
-              })
-              .show();
+                  .content(R.string.content_test)
+                  .inputType(InputType.TYPE_CLASS_TEXT)
+                  .input(R.string.input_hint, R.string.input_prefill, new MaterialDialog.InputCallback() {
+                    @Override public void onInput(MaterialDialog dialog, CharSequence input) {
+                      // On FAB click, receive user input. Make sure the stock doesn't already exist
+                      // in the DB and proceed accordingly
+                      Cursor c = getContentResolver().query(QuoteProvider.Quotes.CONTENT_URI,
+                              new String[] { QuoteColumns.SYMBOL }, QuoteColumns.SYMBOL + "= ?",
+                              new String[] { input.toString() }, null);
+                      if (c.getCount() != 0) {
+                        Toast toast =
+                                Toast.makeText(MyStocksActivity.this, "This stock is already saved!",
+                                        Toast.LENGTH_LONG);
+                        toast.setGravity(Gravity.CENTER, Gravity.CENTER, 0);
+                        toast.show();
+                        return;
+                      } else {
+                        // Add the stock to DB
+                        mServiceIntent.putExtra("tag", "add");
+                        mServiceIntent.putExtra("symbol", input.toString());
+                        startService(mServiceIntent);
+                      }
+                    }
+                  })
+                  .show();
         } else {
           networkToast();
         }
@@ -142,13 +152,13 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
       // create a periodic task to pull stocks once every hour after the app has been opened. This
       // is so Widget data stays up to date.
       PeriodicTask periodicTask = new PeriodicTask.Builder()
-          .setService(StockTaskService.class)
-          .setPeriod(period)
-          .setFlex(flex)
-          .setTag(periodicTag)
-          .setRequiredNetwork(Task.NETWORK_STATE_CONNECTED)
-          .setRequiresCharging(false)
-          .build();
+              .setService(StockTaskService.class)
+              .setPeriod(period)
+              .setFlex(flex)
+              .setTag(periodicTag)
+              .setRequiredNetwork(Task.NETWORK_STATE_CONNECTED)
+              .setRequiresCharging(false)
+              .build();
       // Schedule task with tag "periodic." This ensure that only the stocks present in the DB
       // are updated.
       GcmNetworkManager.getInstance(this).schedule(periodicTask);
@@ -175,9 +185,9 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
 
   @Override
   public boolean onCreateOptionsMenu(Menu menu) {
-      getMenuInflater().inflate(R.menu.my_stocks, menu);
-      restoreActionBar();
-      return true;
+    getMenuInflater().inflate(R.menu.my_stocks, menu);
+    restoreActionBar();
+    return true;
   }
 
   @Override
@@ -205,11 +215,11 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
   public Loader<Cursor> onCreateLoader(int id, Bundle args){
     // This narrows the return to only the stocks that are most current.
     return new CursorLoader(this, QuoteProvider.Quotes.CONTENT_URI,
-        new String[]{ QuoteColumns._ID, QuoteColumns.SYMBOL, QuoteColumns.BIDPRICE,
-            QuoteColumns.PERCENT_CHANGE, QuoteColumns.CHANGE, QuoteColumns.ISUP},
-        QuoteColumns.ISCURRENT + " = ?",
-        new String[]{"1"},
-        null);
+            new String[]{ QuoteColumns._ID, QuoteColumns.SYMBOL, QuoteColumns.BIDPRICE,
+                    QuoteColumns.PERCENT_CHANGE, QuoteColumns.CHANGE, QuoteColumns.ISUP},
+            QuoteColumns.ISCURRENT + " = ?",
+            new String[]{"1"},
+            null);
   }
 
   @Override
